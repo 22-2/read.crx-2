@@ -111,6 +111,7 @@
 
 #### Triage rules
 
+- トリアージ開始時は`.todo`の処理より先に、GitHubの`needs-retriage`ラベル付きIssueをopen/closed問わず確認する。`gh issue list --repo 22-2/ChLens --label needs-retriage --state all --limit 200 --json number,title,state,labels,updatedAt`で候補を列挙し、各Issueを`gh issue view <number> --repo 22-2/ChLens --comments`で読む。追加情報を受けたIssueの再調査を終えるまで、`.todo`の新規候補より優先して扱う。
 - `.todo`を読み、未処理の不満を利用者の問題単位へ整理する。
 - 最初に既存のGitHub Issueをopen/closedの両方で確認する。タイトル、本文、関連語で検索し、重複Issueを作らない。
 - `needs-priority`と`needs-info`は実装候補としては無視するが、重複確認の対象からは外さない。前者は調査済みで人の優先度判断を待つ状態、後者は情報の追記を待つ状態である。
