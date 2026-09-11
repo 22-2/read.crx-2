@@ -772,8 +772,20 @@ function tabReducer(state: TabStoreState, action: ScopedTabAction): TabStoreStat
       const target = pane.tabs.find((t) => t.id === action.tabId);
       // 固定タブは閉じられない
       if (!target || target.pinned) return state;
-      // ペインは最低1タブを保つ（空にしたい場合はペインを閉じる）。
-      if (pane.tabs.length <= 1) return state;
+      if (pane.tabs.length <= 1) {
+        // 変更理由: 最後の通常タブを削除してペインが空になると、表示と操作の対象を失うため、
+        // 元タブを閉じたタブ履歴へ残したうえで、Issueの期待するホームタブへ置き換える。
+        const replacement = createTabFromPage({ type: "home", title: "ホーム" });
+        return {
+          ...updatePane(state, paneId, (p) => ({
+            ...p,
+            tabs: [replacement],
+            activeTabId: replacement.id,
+          })),
+          activePaneId: paneId,
+          closedTabs: pushClosed(state.closedTabs, target),
+        };
+      }
       const closingIndex = pane.tabs.indexOf(target);
       const remaining = pane.tabs.filter((t) => t.id !== action.tabId);
       let newActiveId = pane.activeTabId;

@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { getPageViewStateKey } from "src/view/browser/types";
+import { getCurrentPage, getPageViewStateKey } from "src/view/browser/types";
 import { getAutoRefreshPageKey } from "src/view/browser/utils/auto-refresh-pages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
@@ -1559,5 +1559,67 @@ describe("TabProvider auto refresh state", () => {
         parsed.panes?.[0]?.tabs?.[0]?.viewStates?.[getPageViewStateKey(thread1)]?.searchTarget,
       ).toBe("name");
     });
+  });
+
+  it("最後のタブを閉じるとホームタブへ置き換え、元タブを閉じたタブ履歴へ残す", async () => {
+    vi.resetModules();
+    const { TabProvider, useTabStore } = await import("src/view/browser/hooks/use-tab-store");
+    const threadPage = {
+      type: "thread" as const,
+      title: "閉じるスレッド",
+      threadUrl: "https://example.com/test/read.cgi/foo/1/",
+    };
+
+    function Harness() {
+      const { state, activeTab, currentPage, dispatch } = useTabStore();
+
+      return (
+        <>
+          <button onClick={() => dispatch({ type: "NAVIGATE", page: threadPage })}>
+            スレッドへ移動
+          </button>
+          <button onClick={() => dispatch({ type: "CLOSE_TAB", tabId: activeTab.id })}>
+            最後のタブを閉じる
+          </button>
+          <button onClick={() => dispatch({ type: "REOPEN_CLOSED_TAB" })}>閉じたタブを開く</button>
+          <output data-testid="tabs-count">{state.tabs.length}</output>
+          <output data-testid="active-tab-id">{activeTab.id}</output>
+          <output data-testid="current-page-type">{currentPage.type}</output>
+          <output data-testid="current-page-title">{currentPage.title}</output>
+          <output data-testid="closed-tabs-count">{state.closedTabs.length}</output>
+          <output data-testid="closed-page-type">
+            {state.closedTabs[0] ? getCurrentPage(state.closedTabs[0]).type : ""}
+          </output>
+          <output data-testid="closed-page-title">
+            {state.closedTabs[0] ? getCurrentPage(state.closedTabs[0]).title : ""}
+          </output>
+        </>
+      );
+    }
+
+    render(
+      <TabProvider>
+        <Harness />
+      </TabProvider>,
+    );
+
+    const originalTabId = screen.getByTestId("active-tab-id").textContent;
+    fireEvent.click(screen.getByText("スレッドへ移動"));
+    fireEvent.click(screen.getByText("最後のタブを閉じる"));
+
+    expect(screen.getByTestId("tabs-count")).toHaveTextContent("1");
+    expect(screen.getByTestId("active-tab-id").textContent).not.toBe(originalTabId);
+    expect(screen.getByTestId("current-page-type")).toHaveTextContent("home");
+    expect(screen.getByTestId("current-page-title")).toHaveTextContent("ホーム");
+    expect(screen.getByTestId("closed-tabs-count")).toHaveTextContent("1");
+    expect(screen.getByTestId("closed-page-type")).toHaveTextContent("thread");
+    expect(screen.getByTestId("closed-page-title")).toHaveTextContent("閉じるスレッド");
+
+    fireEvent.click(screen.getByText("閉じたタブを開く"));
+
+    expect(screen.getByTestId("tabs-count")).toHaveTextContent("2");
+    expect(screen.getByTestId("current-page-type")).toHaveTextContent("thread");
+    expect(screen.getByTestId("current-page-title")).toHaveTextContent("閉じるスレッド");
+    expect(screen.getByTestId("closed-tabs-count")).toHaveTextContent("0");
   });
 });
